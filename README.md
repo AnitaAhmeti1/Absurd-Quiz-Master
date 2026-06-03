@@ -1,4 +1,4 @@
-# 🎉 Wrong Answers Only
+#  Wrong Answers Only
 
 > A quiz game where every single answer is wrong. That's not a bug. That's the whole point.
 
