@@ -10,7 +10,6 @@ interface AppState {
   screen: "home" | "loading" | "question" | "reveal";
   topic: string;
   questionCount: number;
-  score: number;
   streak: number;
   currentQuestion: QuizQuestion | null;
   pickedAnswer: string | null;
@@ -23,7 +22,6 @@ const state: AppState = {
   screen: "home",
   topic: "",
   questionCount: 0,
-  score: 0,
   streak: 0,
   currentQuestion: null,
   pickedAnswer: null,
@@ -45,12 +43,22 @@ const PRESET_TOPICS = [
 const LETTERS = ["A", "B", "C", "D"];
 
 const LOADING_QUIPS = [
-  "Consulting the wrong encyclopedia...",
-  "Asking my totally unqualified sources...",
-  "Generating confidently incorrect answers...",
-  "Fabricating plausible nonsense...",
-  "Summoning the spirit of misinformation...",
+  "Cooking up some nonsense...",
+  "Consulting our panel of wrong experts...",
+  "Fabricating plausible rubbish...",
+  "Asking someone who definitely doesn't know...",
+  "Generating certified incorrect answers...",
+  "Digging through the wrong encyclopedia...",
 ];
+
+const STREAK_MESSAGES: Record<number, string> = {
+  3:  "Hat-trick of wrongness!",
+  5:  "5 in a row! You're on fire!",
+  7:  "Lucky 7 wrong answers!",
+  10: "10 WRONG! You're unstoppable!",
+  15: "15 wrong answers. Are you even trying to be right?",
+  20: "20 wrong answers! Certified expert in being incorrect!",
+};
 
 // ---- API ----
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -92,13 +100,16 @@ function render() {
 function renderHeader(): string {
   return `
     <header class="header">
-      <div class="logo">❌ <span>Wrong Answers Only</span></div>
+      <div class="logo">
+        <span class="logo-emoji">🎉</span>
+        Wrong Answers Only
+      </div>
       <div class="score-bar">
         <div class="score-pill">
-          Answered <span class="value">${state.questionCount}</span>
+          Q&nbsp;<span class="value">${state.questionCount}</span>
         </div>
         <div class="score-pill streak-pill">
-          Streak <span class="value">${state.streak}</span>
+          🔥&nbsp;<span class="value">${state.streak}</span>
         </div>
       </div>
     </header>
@@ -121,39 +132,45 @@ function renderHome(): string {
     </button>
   `).join("");
 
+  const customVal = state.topic && !PRESET_TOPICS.find(t => t.label === state.topic) ? state.topic : "";
+
   return `
     <div class="card">
+      <div class="home-eyebrow">🎮 Party Quiz</div>
       <h1 class="home-title">
         <span class="wrong">Wrong Answers</span>Only.
       </h1>
       <p class="home-subtitle">
-        Pick a topic. Claude generates a real question with 4 confidently wrong answers.
-        Every answer is incorrect — that's the whole point.
+        Pick a topic. Every question has 4 options — and every single one is wrong.
+        That's not a bug. That's the game.
       </p>
 
+      <p class="section-label">Pick a topic</p>
       <div class="topics-grid">${topicBtns}</div>
+
+      <div class="divider">or</div>
 
       <div class="custom-topic-row">
         <input
           class="custom-input"
           id="custom-topic"
           type="text"
-          placeholder="Or type any topic..."
-          value="${state.topic && !PRESET_TOPICS.find(t => t.label === state.topic) ? state.topic : ""}"
+          placeholder="Type any topic..."
+          value="${customVal}"
           maxlength="60"
         />
         <button
           class="btn-primary"
           id="start-btn"
           ${state.topic.trim() ? "" : "disabled"}
-        >Let's Go</button>
+        >Let's Go!</button>
       </div>
 
-      ${state.error ? `<div class="error-box">⚠️ ${state.error}</div>` : ""}
+      ${state.error ? `<div class="error-box">😬 ${state.error}</div>` : ""}
 
       ${state.questionCount > 0 ? `
-        <p style="color:var(--text-muted);font-size:0.82rem;text-align:center;margin-top:8px;">
-          You've survived ${state.questionCount} wrong answer${state.questionCount !== 1 ? "s" : ""} so far.
+        <p class="played-note">
+          You've answered ${state.questionCount} question${state.questionCount !== 1 ? "s" : ""} — all of them wrong!
         </p>
       ` : ""}
     </div>
@@ -165,7 +182,9 @@ function renderLoading(): string {
   return `
     <div class="card">
       <div class="loading-screen">
-        <div class="spinner"></div>
+        <div class="loading-dots">
+          <span></span><span></span><span></span><span></span>
+        </div>
         <p class="loading-text">${quip}</p>
       </div>
     </div>
@@ -177,7 +196,7 @@ function renderQuestion(): string {
   const { question, answers } = state.currentQuestion;
 
   const answerBtns = answers.map((a, i) => `
-    <button class="answer-btn" data-answer="${encodeURIComponent(a)}">
+    <button class="answer-btn" data-index="${i}" data-answer="${encodeURIComponent(a)}">
       <span class="answer-letter">${LETTERS[i]}</span>
       <span>${a}</span>
     </button>
@@ -199,39 +218,39 @@ function renderReveal(): string {
   if (!state.currentQuestion || !state.pickedAnswer) return "";
   const { question } = state.currentQuestion;
 
-  const streakMsg = state.streak >= 3 ? `
-    <div class="streak-banner">
-      🔥 ${state.streak} wrong in a row! You're on a roll of failure!
-    </div>
+  const streakMsg = STREAK_MESSAGES[state.streak];
+  const streakBanner = streakMsg ? `
+    <div class="streak-banner">🔥 ${streakMsg}</div>
   ` : "";
 
   const explanationContent = state.explanation
-    ? `<div class="explanation-box">${state.explanation}</div>`
+    ? `<div class="explanation-box">💬 ${state.explanation}</div>`
     : state.error
-    ? `<div class="error-box">Couldn't fetch explanation: ${state.error}</div>`
+    ? `<div class="error-box">Couldn't load the verdict: ${state.error}</div>`
     : `<div class="explanation-box">
          <div class="explanation-loading">
-           <div class="explain-spinner"></div> Claude is crafting your roast...
+           <div class="explain-dots"><span></span><span></span><span></span></div>
+           Calculating exactly how wrong you are...
          </div>
        </div>`;
 
   return `
     <div class="card">
-      <div class="reveal-badge">❌ Nope. Wrong. Incorrect.</div>
+      <div class="reveal-badge">❌ Nope! Still wrong!</div>
 
-      ${streakMsg}
+      ${streakBanner}
 
-      <p class="question-text" style="margin-bottom:16px;font-size:1.05rem;">${question}</p>
+      <p class="question-text" style="font-size:1rem;margin-bottom:14px;">${question}</p>
 
       <div class="picked-answer-box">
-        <strong>You picked</strong>
+        <strong>Your answer</strong>
         ${state.pickedAnswer}
       </div>
 
       ${explanationContent}
 
       <div class="reveal-actions">
-        <button class="btn-primary" id="next-btn">Next Question</button>
+        <button class="btn-primary" id="next-btn">Next Question &rarr;</button>
         <button class="btn-secondary" id="home-btn">Change Topic</button>
       </div>
     </div>
@@ -243,7 +262,6 @@ function attachListeners() {
   const screen = state.screen;
 
   if (screen === "home") {
-    // Preset topic buttons
     document.querySelectorAll<HTMLButtonElement>(".topic-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         state.topic = btn.dataset.topic ?? "";
@@ -253,7 +271,6 @@ function attachListeners() {
       });
     });
 
-    // Custom input
     const customInput = document.getElementById("custom-topic") as HTMLInputElement;
     if (customInput) {
       customInput.addEventListener("input", () => {
@@ -266,7 +283,6 @@ function attachListeners() {
       });
     }
 
-    // Start button
     const startBtn = document.getElementById("start-btn");
     if (startBtn) {
       startBtn.addEventListener("click", () => {
@@ -285,11 +301,8 @@ function attachListeners() {
   }
 
   if (screen === "reveal") {
-    const nextBtn = document.getElementById("next-btn");
-    if (nextBtn) nextBtn.addEventListener("click", nextQuestion);
-
-    const homeBtn = document.getElementById("home-btn");
-    if (homeBtn) homeBtn.addEventListener("click", goHome);
+    document.getElementById("next-btn")?.addEventListener("click", nextQuestion);
+    document.getElementById("home-btn")?.addEventListener("click", goHome);
   }
 }
 
@@ -305,25 +318,22 @@ async function startQuiz() {
     render();
   } catch (err) {
     state.screen = "home";
-    state.error = err instanceof Error ? err.message : "Something went wrong. Try again.";
+    state.error = err instanceof Error ? err.message : "Something went wrong — try again!";
     render();
   }
 }
 
 async function pickAnswer(btn: HTMLButtonElement, answer: string) {
-  // Disable all buttons immediately
   document.querySelectorAll<HTMLButtonElement>(".answer-btn").forEach(b => {
     b.disabled = true;
   });
 
-  // Animate the picked one
   btn.classList.add("wrong");
 
   state.pickedAnswer = answer;
   state.questionCount += 1;
   state.streak += 1;
 
-  // Short delay for animation, then reveal
   await sleep(500);
 
   state.screen = "reveal";
@@ -331,7 +341,6 @@ async function pickAnswer(btn: HTMLButtonElement, answer: string) {
   state.error = null;
   render();
 
-  // Fetch explanation async — re-render when it arrives
   try {
     const explanation = await fetchExplanation(
       state.topic,
@@ -356,7 +365,7 @@ async function nextQuestion() {
     render();
   } catch (err) {
     state.screen = "home";
-    state.error = err instanceof Error ? err.message : "Something went wrong. Try again.";
+    state.error = err instanceof Error ? err.message : "Something went wrong — try again!";
     render();
   }
 }
